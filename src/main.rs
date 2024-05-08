@@ -6,10 +6,12 @@ mod ws;
 
 use esp_backtrace as _;
 
+use esp_hal::gpio::{GpioPin, Output, PushPull};
 use esp_hal::prelude::*;
 use esp_hal::rng::Rng;
 use esp_hal::{
     clock::ClockControl,
+    gpio::IO,
     embassy::{
         self,
         executor::Executor,
@@ -17,7 +19,7 @@ use esp_hal::{
     peripherals::Peripherals,
     timer::TimerGroup,
 };
-use esp_wifi::wifi::{self, WifiController, WifiDevice, WifiEvent, WifiStaDevice, WifiState};
+use esp_wifi::wifi::{self, WifiController, WifiDevice, WifiEvent, WifiStaDevice, WifiState, WifiError};
 
 use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
@@ -77,6 +79,10 @@ fn main() -> ! {
     // Set up logging
     esp_println::logger::init_logger_from_env();
 
+    // Initialize LED
+    let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    let led = io.pins.gpio13.into_push_pull_output();
+
     // Initialize WiFi
     let timer = esp_hal::timer::TimerGroup::new(peripherals.TIMG1, &clocks, None).timer0;
     let rng = esp_hal::rng::Rng::new(peripherals.RNG);
@@ -95,7 +101,7 @@ fn main() -> ! {
     let executor = make_static!(Executor::new());
 
     executor.run(|spawner| {
-    _ = spawner.spawn(networking_task(wifi_interface, wifi_controller, rng));
+    _ = spawner.spawn(networking_task(wifi_interface, wifi_controller, rng, led));
     });
 }
 
@@ -105,7 +111,7 @@ async fn net_stack_task(stack: &'static Stack<WifiDevice<'static, WifiStaDevice>
 }
 
 #[embassy_executor::task]
-async fn connection_task(mut controller: WifiController<'static>) -> () {
+async fn connection_task(mut controller: WifiController<'static>, mut led: GpioPin<Output<PushPull>, 13>) -> () {
 
     loop {
 
@@ -131,9 +137,21 @@ async fn connection_task(mut controller: WifiController<'static>) -> () {
         }
 
         match controller.connect().await {
-            Ok(_) => log::info!("WiFi connected"),
+            Ok(_) => {
+                log::info!("WiFi connected");
+                led.set_high();
+            },
             Err(e) => {
-                log::error!("Failed to connect WiFi: {e:?}");
+                match e  {
+                    WifiError::Disconnected => {
+                        log::info!("WiFi not connected. Retry to connect in 5 s.");
+                        led.set_low();
+                    },
+                    _ => {
+                        log::error!("Failed to connect WiFi: {e:?}");
+                    }
+                }
+
                 Timer::after(Duration::from_secs(5)).await;
             },
         }
@@ -141,7 +159,7 @@ async fn connection_task(mut controller: WifiController<'static>) -> () {
 }
 
 #[embassy_executor::task]
-async fn networking_task(interface: WifiDevice<'static, WifiStaDevice>, controller: WifiController<'static>, rng: Rng) {
+async fn networking_task(interface: WifiDevice<'static, WifiStaDevice>, controller: WifiController<'static>, rng: Rng, led: GpioPin<Output<PushPull>, 13>) {
 
     // Create network stack
     let config = embassy_net::Config::dhcpv4(Default::default());
@@ -156,7 +174,7 @@ async fn networking_task(interface: WifiDevice<'static, WifiStaDevice>, controll
 
     let spawner = Spawner::for_current_executor().await;
     _ = spawner.spawn(net_stack_task(&stack));
-    _ = spawner.spawn(connection_task(controller));
+    _ = spawner.spawn(connection_task(controller, led));
     
 
     log::info!("Waiting for network link");

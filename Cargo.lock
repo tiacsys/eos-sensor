@@ -234,9 +234,9 @@ dependencies = [
 
 [[package]]
 name = "either"
-version = "1.11.0"
+version = "1.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a47c1c47d2f5964e29c61246e81db715514cd532db6b5116a25ea3c03d6780a2"
+checksum = "3dca9240753cf90908d7e4aac30f630662b02aebaa1b58a3cadabdb23385b58b"
 
 [[package]]
 name = "embassy-executor"
@@ -508,8 +508,10 @@ dependencies = [
  "esp-hal",
  "esp-println",
  "esp-wifi",
+ "fugit",
  "hecate-protobuf",
  "log",
+ "lsm9ds1",
  "rand",
  "static_cell",
  "toml-cfg",
@@ -523,9 +525,9 @@ checksum = "5443807d6dff69373d433ab9ef5378ad8df50ca6298caf15de6e52e24aaf54d5"
 
 [[package]]
 name = "errno"
-version = "0.3.8"
+version = "0.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a258e46cdc063eb8519c00b9fc845fc47bcfca4130e2f08e88665ceda8474245"
+checksum = "534c5cf6194dfab3db3242765c03bbe257cf92f22b38f6bc0c58d59108a820ba"
 dependencies = [
  "libc",
  "windows-sys",
@@ -579,6 +581,7 @@ dependencies = [
  "embassy-time-driver",
  "embedded-can",
  "embedded-dma",
+ "embedded-hal 0.2.7",
  "embedded-hal 1.0.0",
  "embedded-hal-async",
  "embedded-hal-nb",
@@ -893,6 +896,7 @@ dependencies = [
 [[package]]
 name = "hecate-protobuf"
 version = "0.1.0"
+source = "git+https://github.com/tiacsys/hecate-protobuf#c42d495dc1789f167637169fe3eb65a254f9ea33"
 dependencies = [
  "anyhow",
  "prost",
@@ -988,9 +992,9 @@ checksum = "9afa463f5405ee81cdb9cc2baf37e08ec7e4c8209442b5d72c04cfb2cd6e6286"
 
 [[package]]
 name = "linux-raw-sys"
-version = "0.4.13"
+version = "0.4.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "01cda141df6706de531b6c46c3a33ecca755538219bd484262fa09410c13539c"
+checksum = "78b3ae25bc7c8c38cec158d1f2757ee79e9b3740fbc7ccf0e59e4b08d793fa89"
 
 [[package]]
 name = "litrs"
@@ -1016,6 +1020,15 @@ name = "log"
 version = "0.4.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "90ed8c1e510134f979dbc4f070f87d4313098b704861a105fe34231c70a3901c"
+
+[[package]]
+name = "lsm9ds1"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1400229713fa9137a61e89fc3b384a53fef1df948b720ab4eb57a04f2669a5f7"
+dependencies = [
+ "embedded-hal 0.2.7",
+]
 
 [[package]]
 name = "managed"

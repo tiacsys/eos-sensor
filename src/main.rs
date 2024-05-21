@@ -262,9 +262,9 @@ async fn networking_task(
                 samples: vec![sample],
             }.encode_to_vec();
 
-            _ = websocket.send_binary(&samples).await;   
+            _ = websocket.send_binary(&samples).await;
+
+            Timer::after_millis(100).await;
         }
     }
-
-
 }

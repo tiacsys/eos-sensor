@@ -42,6 +42,7 @@ use lsm9ds1::interface::I2cInterface;
 use hecate_protobuf as proto;
 use proto::Message;
 
+use rand::RngCore;
 use static_cell::make_static;
 use ringbuffer::{AllocRingBuffer, RingBuffer};
 
@@ -61,11 +62,14 @@ struct Config {
     device_id: &'static str,
 }
 
-#[macro_use]
 extern crate alloc;
 use core::mem::MaybeUninit;
 
-type SensorType = LSM9DS1<I2cInterface<I2C<'static, I2C0, Blocking>>>;
+type LedType = AnyPin<Output<PushPull>, InputOutputAnalogPinType>;
+
+type Sensor = LSM9DS1<I2cInterface<I2C<'static, I2C0, Blocking>>>;
+type NetworkDevice = WifiDevice<'static, WifiStaDevice>;
+// type Rng = Rng; // No alias needed in this case
 
 #[global_allocator]
 static ALLOCATOR: esp_alloc::EspHeap = esp_alloc::EspHeap::empty();
@@ -124,17 +128,47 @@ fn main() -> ! {
     let (wifi_interface, wifi_controller) = esp_wifi::wifi::new_with_mode(&wifi_init, peripherals.WIFI, WifiStaDevice)
         .expect("Failed to create WiFi interface");
 
-    // Set up ringbuffer for sensor data
-    let ringbuffer = AllocRingBuffer::<proto::SensorDataSample>::new(512);
-    let ringbuffer = Arc::new(Mutex::<NoopRawMutex, _>::new(ringbuffer));
+    let p = AppPeripherals {
+        sensor,
+        network_device: wifi_interface,
+        rng
+    };
 
     // Set up embassy executor
     let executor = make_static!(Executor::new());
 
     executor.run(|spawner| {
-    _ = spawner.spawn(networking_task(wifi_interface, wifi_controller, rng, led, ringbuffer.clone()));
-    _ = spawner.spawn(sensor_task(sensor, ringbuffer.clone()));
+        spawner.spawn(wifi_task(wifi_controller, led))
+            .expect("Failed to spawn wifi task");
+        spawner.spawn(app(p))
+            .expect("Failed to spawn application task");
     });
+}
+
+struct AppPeripherals {
+    pub sensor: Sensor,
+    pub network_device: NetworkDevice,
+    pub rng: Rng,
+}
+
+#[embassy_executor::task]
+async fn app(p: AppPeripherals) -> () {
+    let spawner = embassy_executor::Spawner::for_current_executor().await;
+
+    let AppPeripherals {
+        sensor,
+        network_device,
+        rng
+    } = p;
+
+    let ringbuffer = AllocRingBuffer::<proto::SensorDataSample>::new(512);
+    let ringbuffer = Arc::new(Mutex::<NoopRawMutex, _>::new(ringbuffer));
+
+    spawner.spawn(sensor_task(sensor, ringbuffer.clone()))
+        .expect("Failed to spawn sensor task");
+
+    spawner.spawn(network_task(network_device, rng, ringbuffer.clone()))
+        .expect("Failed to spawn network task");
 }
 
 #[embassy_executor::task]
@@ -143,7 +177,7 @@ async fn net_stack_task(stack: &'static Stack<WifiDevice<'static, WifiStaDevice>
 }
 
 #[embassy_executor::task]
-async fn connection_task(mut controller: WifiController<'static>, mut led: AnyPin<Output<PushPull>, InputOutputAnalogPinType>) -> () {
+async fn wifi_task(mut controller: WifiController<'static>, mut led: LedType) -> () {
 
     loop {
 
@@ -191,17 +225,15 @@ async fn connection_task(mut controller: WifiController<'static>, mut led: AnyPi
 }
 
 #[embassy_executor::task]
-async fn networking_task(
-    interface: WifiDevice<'static, WifiStaDevice>,
-    controller: WifiController<'static>,
-    rng: Rng,
-    led: AnyPin<Output<PushPull>, InputOutputAnalogPinType>,
+async fn network_task(
+    interface: NetworkDevice,
+    mut rng: Rng,
     ringbuffer: Arc<Mutex<NoopRawMutex, AllocRingBuffer<proto::SensorDataSample>>>,
 ) {
 
     // Create network stack
     let config = embassy_net::Config::dhcpv4(Default::default());
-    let seed = 42;
+    let seed = rng.next_u64();
 
     let stack = &*make_static!(Stack::new(
         interface,
@@ -212,7 +244,6 @@ async fn networking_task(
 
     let spawner = Spawner::for_current_executor().await;
     _ = spawner.spawn(net_stack_task(&stack));
-    _ = spawner.spawn(connection_task(controller, led));
     
 
     log::info!("Waiting for network link");
@@ -268,7 +299,7 @@ async fn networking_task(
 
 #[embassy_executor::task]
 async fn sensor_task(
-    mut sensor: SensorType,
+    mut sensor: Sensor,
     ringbuffer_mut: Arc<Mutex<NoopRawMutex, AllocRingBuffer<proto::SensorDataSample>>>,
 ) {
 

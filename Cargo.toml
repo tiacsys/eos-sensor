@@ -30,6 +30,7 @@ esp-alloc = { version = "0.3.0" }
 lsm9ds1 = "0.1.0"
 fugit = "0.3.7"
 hecate-protobuf = { git = "https://github.com/tiacsys/hecate-protobuf" }
+ringbuffer = "0.15.0"
 
 [profile.dev]
 # Rust debug is too slow. 

@@ -6,6 +6,9 @@ mod ws;
 
 use esp_backtrace as _;
 
+use alloc::sync::Arc;
+use alloc::vec::Vec;
+
 use esp_hal::gpio::{AnyPin, Output, PushPull, InputOutputAnalogPinType};
 use esp_hal::prelude::*;
 use esp_hal::rng::Rng;
@@ -25,6 +28,8 @@ use esp_hal::{
 use esp_wifi::wifi::{self, WifiController, WifiDevice, WifiEvent, WifiStaDevice, WifiState, WifiError};
 
 use embassy_executor::Spawner;
+use embassy_sync::mutex::Mutex;
+use embassy_sync::blocking_mutex::raw::NoopRawMutex; // We only run tasks on the same executor
 use embassy_time::{Duration, Instant, Timer};
 use embassy_net::{
     Stack,
@@ -35,9 +40,10 @@ use lsm9ds1::{LSM9DS1Init, LSM9DS1};
 use lsm9ds1::interface::I2cInterface;
 
 use hecate_protobuf as proto;
-use hecate_protobuf::Message;
+use proto::Message;
 
 use static_cell::make_static;
+use ringbuffer::{AllocRingBuffer, RingBuffer};
 
 #[toml_cfg::toml_config]
 struct Config {
@@ -118,11 +124,16 @@ fn main() -> ! {
     let (wifi_interface, wifi_controller) = esp_wifi::wifi::new_with_mode(&wifi_init, peripherals.WIFI, WifiStaDevice)
         .expect("Failed to create WiFi interface");
 
+    // Set up ringbuffer for sensor data
+    let ringbuffer = AllocRingBuffer::<proto::SensorDataSample>::new(512);
+    let ringbuffer = Arc::new(Mutex::<NoopRawMutex, _>::new(ringbuffer));
+
     // Set up embassy executor
     let executor = make_static!(Executor::new());
 
     executor.run(|spawner| {
-    _ = spawner.spawn(networking_task(wifi_interface, wifi_controller, rng, led, sensor));
+    _ = spawner.spawn(networking_task(wifi_interface, wifi_controller, rng, led, ringbuffer.clone()));
+    _ = spawner.spawn(sensor_task(sensor, ringbuffer.clone()));
     });
 }
 
@@ -185,7 +196,7 @@ async fn networking_task(
     controller: WifiController<'static>,
     rng: Rng,
     led: AnyPin<Output<PushPull>, InputOutputAnalogPinType>,
-    mut sensor: SensorType,
+    ringbuffer: Arc<Mutex<NoopRawMutex, AllocRingBuffer<proto::SensorDataSample>>>,
 ) {
 
     // Create network stack
@@ -237,7 +248,30 @@ async fn networking_task(
     if let Ok(()) = websocket.send_text(CONFIG.device_id).await {
         log::info!("Sent id");
     }
-    
+
+    loop {
+
+        let samples = {
+            let mut ringbuffer = ringbuffer.lock().await;
+            ringbuffer.drain().take(50).collect::<Vec<_>>()
+        };
+
+        let data = proto::SensorData {
+            samples,
+        }.encode_to_vec();
+        _ = websocket.send_binary(&data).await;
+
+        Timer::after_millis(100).await;
+    }
+
+}
+
+#[embassy_executor::task]
+async fn sensor_task(
+    mut sensor: SensorType,
+    ringbuffer_mut: Arc<Mutex<NoopRawMutex, AllocRingBuffer<proto::SensorDataSample>>>,
+) {
+
     sensor.begin_accel().expect("Failed to initialize accelerometer");
     sensor.begin_gyro().expect("Failed to initialize gyroscope");
     sensor.begin_mag().expect("Failed to initialize magnetometer");
@@ -250,6 +284,7 @@ async fn networking_task(
         let mag = sensor.read_mag();
 
         if let (Ok((ax, ay, az)), Ok((gx, gy, gz)), Ok((mx, my, mz))) = (acc, gyro, mag) {
+            let timer = Timer::after_millis(10);
             let time = Instant::now() - start;
             let sample = proto::SensorDataSample {
                 time: time.as_millis() as f32 / 1000.0,
@@ -258,13 +293,12 @@ async fn networking_task(
                 gyroscope: proto::GyroscopeData { x: gx, y: gy, z: gz },
             };
 
-            let samples = proto::SensorData {
-                samples: vec![sample],
-            }.encode_to_vec();
+            {
+                let mut ringbuffer = ringbuffer_mut.lock().await;
+                ringbuffer.push(sample);
+            }
 
-            _ = websocket.send_binary(&samples).await;
-
-            Timer::after_millis(100).await;
+            timer.await;
         }
     }
 }

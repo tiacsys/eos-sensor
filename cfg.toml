@@ -1,7 +1,7 @@
 [eos-sensor]
 wifi_ssid = "FRITZ!Box 7490"
 wifi_psk = "18022928027597590321"
-ws_host = "192.168.178.22"
+ws_host = "192.168.178.20"
 ws_port = 8000
 ws_endpoint = "/ws"
 device_id = "Eos"

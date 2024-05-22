@@ -493,7 +493,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "eos-sensor"
+name = "eos-sensor-esp"
 version = "0.1.0"
 dependencies = [
  "embassy-executor",

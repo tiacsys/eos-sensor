@@ -1,4 +1,4 @@
-[eos-sensor]
+[eos-sensor-esp]
 wifi_ssid = "FRITZ!Box 7490"
 wifi_psk = "18022928027597590321"
 ws_host = "192.168.178.20"

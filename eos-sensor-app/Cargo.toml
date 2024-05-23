@@ -8,12 +8,13 @@ defmt = "0.3.8"
 embassy-executor = { version = "0.5.0", features = ["nightly"] }
 embassy-net = { version = "0.4.0", features = ["dhcpv4", "tcp"] }
 embassy-sync = "0.5.0"
-embassy-time = { version = "0.3.0", features = ["generic-queue"] }
+embassy-time = "0.3.0"
 embedded-websocket = { version = "0.9.3", default-features = false }
 esp-println = { version = "0.9.1", features = ["log"], optional = true }
 hecate-protobuf = { git = "https://github.com/tiacsys/hecate-protobuf" }
 log = { version = "0.4.21", optional = true }
 platform-esp = { path = "../platform-esp", optional = true }
+platform-stm = { path = "../platform-stm", optional = true }
 rand = { version = "0.8.5", default-features = false, features = ["alloc", "nightly"] }
 ringbuffer = "0.15.0"
 static_cell = { version = "2.1.0", features = ["nightly"] }
@@ -26,5 +27,6 @@ embassy-executor = { git = "https://github.com/embassy-rs/embassy", branch = "ma
 embassy-sync = { git = "https://github.com/embassy-rs/embassy", branch = "main" }
 
 [features]
-platform-esp = ["dep:platform-esp", "dep:log"]
-default = ["platform-esp"] # for debugging
+platform-esp = ["dep:platform-esp", "dep:log", "embassy-time/generic-queue"]
+platform-stm = ["dep:platform-stm", "embassy-net/defmt"]
+# default = ["platform-esp"] # for debugging

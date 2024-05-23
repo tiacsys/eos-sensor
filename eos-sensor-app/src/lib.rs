@@ -7,8 +7,14 @@ mod ws;
 #[cfg(feature = "platform-esp")]
 use platform_esp as platform;
 
+#[cfg(feature = "platform-stm")]
+use platform_stm as platform;
+
 #[cfg(feature = "platform-esp")]
 use log::info;
+
+#[cfg(not(feature = "platform-esp"))]
+use defmt::info;
 
 use platform::{
     Sensor,
@@ -115,7 +121,7 @@ async fn network_task(
         app_config.ws_port,
         app_config.ws_endpoint,
         &stack,
-        rng.clone(),
+        rng,
         &mut ws_buffers,
     ).await.expect("Failed to connect");
 

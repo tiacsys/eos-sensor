@@ -2,8 +2,8 @@
 #![no_main]
 #![feature(type_alias_impl_trait)]
 
-mod platform;
 mod app;
+pub use platform_esp as platform;
 
 use app::AppConfig;
 

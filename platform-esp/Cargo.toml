@@ -1,0 +1,9 @@
+[package]
+name = "platform-esp"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+esp-hal = { version = "0.17.0", features = ["async", "embassy", "embassy-time-timg0", "embedded-hal-02", "esp32"] }
+esp-wifi = { version = "0.5.1", features = ["embassy-net", "esp32", "wifi"] }
+lsm9ds1 = "0.1.0"

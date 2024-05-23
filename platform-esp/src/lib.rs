@@ -1,3 +1,5 @@
+#![no_std]
+
 use esp_hal::{
     Blocking,
     i2c::I2C,

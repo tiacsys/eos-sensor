@@ -12,7 +12,7 @@ use log::info;
 use platform::{
     Sensor,
     NetworkDevice,
-    Rng,
+    RngDevice,
 };
 
 extern crate alloc;
@@ -44,7 +44,7 @@ pub struct AppConfig {
 pub struct AppPeripherals {
     pub sensor: Sensor,
     pub network_device: NetworkDevice,
-    pub rng: Rng,
+    pub rng: RngDevice,
 }
 
 #[embassy_executor::task]
@@ -71,7 +71,7 @@ pub async fn app(p: AppPeripherals, config: AppConfig) -> () {
 async fn network_task(
     app_config: AppConfig,
     interface: NetworkDevice,
-    mut rng: Rng,
+    mut rng: RngDevice,
     ringbuffer: Arc<Mutex<NoopRawMutex, AllocRingBuffer<proto::SensorDataSample>>>,
 ) {
 

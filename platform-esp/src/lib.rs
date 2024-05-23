@@ -4,13 +4,14 @@ use esp_hal::{
     Blocking,
     i2c::I2C,
     peripherals::I2C0,
+    rng::Rng,
 };
 use esp_wifi::wifi::{WifiDevice, WifiStaDevice};
 use lsm9ds1::{LSM9DS1, interface::I2cInterface};
 
 pub type Sensor = LSM9DS1<I2cInterface<I2C<'static, I2C0, Blocking>>>;
 pub type NetworkDevice = WifiDevice<'static, WifiStaDevice>;
-pub use esp_hal::rng::Rng;
+pub type RngDevice = Rng;
 
 #[cfg(feature="type-checks")]
 mod type_checks {
@@ -22,7 +23,7 @@ mod type_checks {
     fn implements_driver<T: Driver>() {}
     
     fn rng_implements_rngcore() {
-        implements_rngcore::<super::Rng>();
+        implements_rngcore::<super::RngDevice>();
     }
 
     fn network_device_implements_driver() {

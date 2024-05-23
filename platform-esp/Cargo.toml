@@ -11,5 +11,9 @@ lsm9ds1 = "0.1.0"
 rand_core = { version = "0.6.4", optional = true }
 embassy-net-driver = { version = "0.2.0", optional = true }
 
+[patch.crates-io]
+embassy-time-driver = { git = "https://github.com/embassy-rs/embassy", branch = "main" }
+embassy-net-driver = { git = "https://github.com/embassy-rs/embassy", branch = "main" }
+
 [features]
 type-checks = ["dep:rand_core", "dep:embassy-net-driver"]

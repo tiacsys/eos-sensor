@@ -18,6 +18,13 @@ rand = { version = "0.8.5", default-features = false, features = ["alloc", "nigh
 ringbuffer = "0.15.0"
 static_cell = { version = "2.1.0", features = ["nightly"] }
 
+[patch.crates-io]
+embassy-time-driver = { git = "https://github.com/embassy-rs/embassy", branch = "main" }
+embassy-time = { git = "https://github.com/embassy-rs/embassy", branch = "main" }
+embassy-net = { git = "https://github.com/embassy-rs/embassy", branch = "main" }
+embassy-executor = { git = "https://github.com/embassy-rs/embassy", branch = "main" }
+embassy-sync = { git = "https://github.com/embassy-rs/embassy", branch = "main" }
+
 [features]
 platform-esp = ["dep:platform-esp", "dep:log"]
 default = ["platform-esp"] # for debugging

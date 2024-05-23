@@ -32,5 +32,12 @@ fugit = "0.3.7"
 hecate-protobuf = { git = "https://github.com/tiacsys/hecate-protobuf" }
 ringbuffer = "0.15.0"
 platform-esp = { path = "../platform-esp" }
-eos-sensor-app = { path = "../eos-sensor-app" }
+eos-sensor-app = { path = "../eos-sensor-app", features = ["platform-esp"]}
 defmt = "0.3.8"
+
+[patch.crates-io]
+embassy-time-driver = { git = "https://github.com/embassy-rs/embassy", branch = "main" }
+embassy-net-driver = { git = "https://github.com/embassy-rs/embassy", branch = "main" }
+embassy-time = { git = "https://github.com/embassy-rs/embassy", branch = "main" }
+embassy-net = { git = "https://github.com/embassy-rs/embassy", branch = "main" }
+embassy-executor = { git = "https://github.com/embassy-rs/embassy", branch = "main" }

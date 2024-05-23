@@ -1,11 +1,21 @@
+#![no_std]
+#![feature(type_alias_impl_trait)]
+
 mod ws;
 
-use crate::platform::{
+#[cfg(feature = "platform-esp")]
+use platform_esp as platform;
+
+#[cfg(feature = "platform-esp")]
+use log::info;
+
+use platform::{
     Sensor,
     NetworkDevice,
     Rng,
 };
 
+extern crate alloc;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use rand::RngCore;
@@ -80,19 +90,19 @@ async fn network_task(
     _ = spawner.spawn(net_stack_task(stack));
     
 
-    log::info!("Waiting for network link");
+    info!("Waiting for network link");
     loop {
         if stack.is_link_up() {
-            log::info!("Link is up");
+            info!("Link is up");
             break;
         }
         Timer::after_secs(1).await;
     }
 
-    log::info!("Waiting for IP address");
+    info!("Waiting for IP address");
     loop {
         if let Some(config) = stack.config_v4() {
-            log::info!("Got IP: {}", config.address);
+            info!("Got IP: {}", config.address);
             break;
         }
         Timer::after_secs(1).await;
@@ -108,10 +118,10 @@ async fn network_task(
         &mut ws_buffers,
     ).await.expect("Failed to connect");
 
-    log::info!("Websocket open");
+    info!("Websocket open");
 
     if let Ok(()) = websocket.send_text(app_config.device_id).await {
-        log::info!("Sent id");
+        info!("Sent id");
     }
 
     loop {

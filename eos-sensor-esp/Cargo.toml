@@ -32,3 +32,5 @@ fugit = "0.3.7"
 hecate-protobuf = { git = "https://github.com/tiacsys/hecate-protobuf" }
 ringbuffer = "0.15.0"
 platform-esp = { path = "../platform-esp" }
+eos-sensor-app = { path = "../eos-sensor-app" }
+defmt = "0.3.8"

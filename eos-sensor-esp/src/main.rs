@@ -2,10 +2,10 @@
 #![no_main]
 #![feature(type_alias_impl_trait)]
 
-mod app;
 pub use platform_esp as platform;
+use eos_sensor_app as app;
 
-use app::AppConfig;
+use app::{AppConfig, AppPeripherals, app};
 
 use esp_backtrace as _;
 
@@ -108,7 +108,7 @@ fn main() -> ! {
     let (wifi_interface, wifi_controller) = esp_wifi::wifi::new_with_mode(&wifi_init, peripherals.WIFI, WifiStaDevice)
         .expect("Failed to create WiFi interface");
 
-    let p = app::AppPeripherals {
+    let p = AppPeripherals {
         sensor,
         network_device: wifi_interface,
         rng
@@ -127,7 +127,7 @@ fn main() -> ! {
     executor.run(|spawner| {
         spawner.spawn(wifi_task(wifi_controller, led))
             .expect("Failed to spawn wifi task");
-        spawner.spawn(app::app(p, config))
+        spawner.spawn(app(p, config))
             .expect("Failed to spawn application task");
     });
 }
@@ -152,10 +152,10 @@ async fn wifi_task(mut controller: WifiController<'static>, mut led: LedType) ->
             });
         
             _ = controller.set_configuration(&config)
-                .inspect_err(|e| log::error!("Failed to set WiFi configuration: {e:?}"));
+                .inspect_err(|e| log::error!("Failed to set WiFi configuration: {:?}", e));
         
             log::info!("Starting WiFi");
-            _ = controller.start().await.inspect_err(|e| log::error!("Failed to start WiFi: {e:?}"));
+            _ = controller.start().await.inspect_err(|e| log::error!("Failed to start WiFi: {:?}", e));
             
         }
 
@@ -171,7 +171,7 @@ async fn wifi_task(mut controller: WifiController<'static>, mut led: LedType) ->
                         led.set_low();
                     },
                     _ => {
-                        log::error!("Failed to connect WiFi: {e:?}");
+                        log::error!("Failed to connect WiFi: {:?}", e);
                     }
                 }
 

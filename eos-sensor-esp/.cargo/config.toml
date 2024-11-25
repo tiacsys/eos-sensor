@@ -1,9 +1,9 @@
 [target.xtensa-esp32-none-elf]
-runner = "espflash flash --monitor"
-
+runner = "espflash flash --monitor -L defmt"
 
 [env]
-ESP_LOGLEVEL="INFO"
+DEFMT_LOG="info"
+ESP_LOG="info"
 
 [build]
 rustflags = [
@@ -13,18 +13,4 @@ rustflags = [
 target = "xtensa-esp32-none-elf"
 
 [unstable]
-build-std = ["core", "alloc"]
-
-[profile.dev]
-# Rust debug is too slow. 
-# For debug builds always builds with some optimization
-opt-level = "s"
-
-[profile.release]
-codegen-units = 1 # LLVM can perform better optimizations using a single thread
-debug = 2
-debug-assertions = false
-incremental = false
-lto = 'fat'
-opt-level = 's'
-overflow-checks = false
+build-std = ["alloc", "core"]

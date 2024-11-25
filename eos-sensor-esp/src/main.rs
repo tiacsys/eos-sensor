@@ -3,33 +3,46 @@
 #![feature(type_alias_impl_trait)]
 #![feature(impl_trait_in_assoc_type)]
 
-pub use platform_esp as platform;
-use eos_sensor_app as app;
-
-use app::{AppConfig, AppPeripherals, app};
-
 use esp_backtrace as _;
+use esp_println as _;
+extern crate alloc;
 
-use esp_hal::gpio::{AnyPin, Output, PushPull, InputOutputAnalogPinType};
-use esp_hal::prelude::*;
+mod app;
+mod ws;
+
+use app::{app, AppConfig, AppPeripherals};
+
+use embassy_executor::Spawner;
+use embassy_time::{Duration, Timer};
 use esp_hal::{
-    clock::ClockControl,
-    gpio::IO,
-    embassy::{
-        self,
-        executor::Executor,
+    clock::CpuClock,
+    gpio,
+    i2c::master::{Config as I2cConfig, I2c},
+    rng,
+};
+use esp_wifi::wifi::{self, WifiController, WifiError, WifiEvent, WifiStaDevice, WifiState};
+use esp_wifi::EspWifiController;
+
+use fugit::HertzU32;
+
+use lsm9ds1::{
+    config::{
+        accel_gyro::{AccelGyroSamplingRate, AccelSamplingRate},
+        magnetometer::SamplingRate,
     },
-    peripherals::Peripherals,
-    timer::TimerGroup,
-    i2c::I2C,
+    interface::i2c::{AddressAg, AddressM},
+    Lsm9ds1Builder,
 };
 
-use esp_wifi::wifi::{self, WifiController, WifiEvent, WifiStaDevice, WifiState, WifiError};
-
-use embassy_time::{Timer, Duration};
-use static_cell::make_static;
-
-use lsm9ds1::LSM9DS1Init;
+#[macro_export]
+macro_rules! make_static {
+    ($t:ty, $val:expr) => ($crate::make_static!($t, $val,));
+    ($t:ty, $val:expr, $(#[$m:meta])*) => {{
+        $(#[$m])*
+        static STATIC_CELL: static_cell::StaticCell<$t> = static_cell::StaticCell::new();
+        STATIC_CELL.init_with(|| $val)
+    }};
+}
 
 #[toml_cfg::toml_config]
 struct Config {
@@ -47,137 +60,129 @@ struct Config {
     device_id: &'static str,
 }
 
-extern crate alloc;
-use core::mem::MaybeUninit;
+#[esp_hal_embassy::main]
+async fn main(spawner: Spawner) {
+    let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
+    let peripherals = esp_hal::init(config);
 
-type LedType = AnyPin<Output<PushPull>, InputOutputAnalogPinType>;
+    esp_alloc::heap_allocator!(72 * 1024);
 
-#[global_allocator]
-static ALLOCATOR: esp_alloc::EspHeap = esp_alloc::EspHeap::empty();
-
-fn init_heap() {
-    const HEAP_SIZE: usize = 32 * 1024;
-    static mut HEAP: MaybeUninit<[u8; HEAP_SIZE]> = MaybeUninit::uninit();
-
-    unsafe {
-        ALLOCATOR.init(HEAP.as_mut_ptr() as *mut u8, HEAP_SIZE);
-    }
-}
-
-#[entry]
-fn main() -> ! {
-    // Get peripherals
-    let peripherals = Peripherals::take();
-    let system = peripherals.SYSTEM.split();
-
-    init_heap();
-
-    // Initialize clocks
-    let clocks = ClockControl::max(system.clock_control).freeze();
-    let timg0 = TimerGroup::new_async(peripherals.TIMG0, &clocks);
-
-    // Initialize embassy (but not the executor itself)
-    embassy::init(&clocks, timg0);
-    
-    // Set up logging
     esp_println::logger::init_logger_from_env();
 
-    // Initialize LED
-    let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
-    let led = io.pins.gpio13.into_push_pull_output().degrade();
+    let timer0 = esp_hal::timer::timg::TimerGroup::new(peripherals.TIMG1);
+    esp_hal_embassy::init(timer0.timer0);
 
-    // Sensor setup
-    let mut qwiic_power = io.pins.gpio2.into_push_pull_output();
-    qwiic_power.set_high();
-    let ag_addr = lsm9ds1::interface::i2c::AgAddress::_2;
-    let mag_addr = lsm9ds1::interface::i2c::MagAddress::_2;
-    let sensor_i2c = I2C::new(peripherals.I2C0, io.pins.gpio22, io.pins.gpio20, 100.kHz(), &clocks, None);
-    let sensor_interface = lsm9ds1::interface::I2cInterface::init(sensor_i2c, ag_addr, mag_addr);
-    let sensor = LSM9DS1Init::default().with_interface(sensor_interface);
+    log::info!("Embassy initialized!");
 
-    // Initialize WiFi
-    let timer = esp_hal::timer::TimerGroup::new(peripherals.TIMG1, &clocks, None).timer0;
-    let rng = esp_hal::rng::Rng::new(peripherals.RNG);
-    let wifi_init = esp_wifi::initialize(
-        esp_wifi::EspWifiInitFor::Wifi,
-        timer,
-        rng.clone(),
-        system.radio_clock_control,
-        &clocks,
-    )
-    .expect("Failed to initialize WiFi");
-    let (wifi_interface, wifi_controller) = esp_wifi::wifi::new_with_mode(&wifi_init, peripherals.WIFI, WifiStaDevice)
-        .expect("Failed to create WiFi interface");
+    // Initialize Wifi
+    let rng = rng::Rng::new(peripherals.RNG);
+    let timer1 = esp_hal::timer::timg::TimerGroup::new(peripherals.TIMG0);
+    let wifi_init = &*make_static!(
+        EspWifiController<'static>,
+        esp_wifi::init(timer1.timer0, rng.clone(), peripherals.RADIO_CLK,).unwrap()
+    );
 
-    let p = AppPeripherals {
-        sensor,
-        network_device: wifi_interface,
-        rng
+    let (wifi_interface, wifi_controller) =
+        esp_wifi::wifi::new_with_mode(wifi_init, peripherals.WIFI, WifiStaDevice)
+            .expect("Failed to create WiFi interface");
+
+    log::info!("Wifi initialized!");
+
+    // Initialize I2C power pin
+    let _neopixel_i2c_power = gpio::Output::new(peripherals.GPIO2, gpio::Level::High);
+
+    // Set up I2C for sensor
+    let i2c_config = I2cConfig::default().with_frequency(HertzU32::kHz(100));
+    let sensor_i2c = I2c::new(peripherals.I2C0, i2c_config)
+        .expect("I2C Config error")
+        .with_scl(peripherals.GPIO20)
+        .with_sda(peripherals.GPIO22);
+
+    // Initialize misc peripherals
+    let wifi_led = gpio::Output::new(peripherals.GPIO13, gpio::Level::Low);
+
+    // Delay to let peripherals power up
+    Timer::after(Duration::from_millis(100)).await;
+
+    // Set up sensor
+    let sensor_i2c_config = lsm9ds1::interface::i2c::Config {
+        addr_ag: AddressAg::_0x6b,
+        addr_m: AddressM::_0x1e,
+    };
+    let sensor_interface = lsm9ds1::interface::I2cInterface::new(sensor_i2c, sensor_i2c_config);
+    let sensor = Lsm9ds1Builder::new()
+        .with_accelerometer_enabled(true)
+        .with_accel_sampling_rate(AccelSamplingRate::_119Hz)
+        .with_magnetometer_enabled(true)
+        .with_magnetometer_sampling_rate(SamplingRate::_80Hz)
+        .with_gyroscope_enabled(true)
+        .with_accel_gyro_sampling_rate(AccelGyroSamplingRate::_119Hz)
+        .init_on(sensor_interface)
+        .expect("Error during sensor init");
+
+    // Set up application
+    let app_peripherals = AppPeripherals {
+        network_interface: wifi_interface,
+        rng: rng.clone(),
+        sensor
     };
 
-    let config = AppConfig {
+    let app_config = AppConfig {
         ws_host: CONFIG.ws_host,
         ws_port: CONFIG.ws_port,
         ws_endpoint: CONFIG.ws_endpoint,
         device_id: CONFIG.device_id,
     };
 
-    // Set up embassy executor
-    let executor = make_static!(Executor::new());
-
-    executor.run(|spawner| {
-        spawner.spawn(wifi_task(wifi_controller, led))
-            .expect("Failed to spawn wifi task");
-        spawner.spawn(app(p, config))
-            .expect("Failed to spawn application task");
-    });
+    // Spawn tasks
+    let _ = spawner.spawn(wifi_task(wifi_controller, wifi_led));
+    let _ = spawner.spawn(app(app_peripherals, app_config));
 }
 
-
 #[embassy_executor::task]
-async fn wifi_task(mut controller: WifiController<'static>, mut led: LedType) -> () {
-
+async fn wifi_task(mut controller: WifiController<'static>, mut led: gpio::Output<'static>) {
     loop {
-
-        if wifi::get_wifi_state() == WifiState::StaConnected {
+        if wifi::wifi_state() == WifiState::StaConnected {
             controller.wait_for_event(WifiEvent::StaDisconnected).await;
             Timer::after(Duration::from_secs(5)).await;
         }
-        
+
         if !matches!(controller.is_started(), Ok(true)) {
-    
             let config = wifi::Configuration::Client(wifi::ClientConfiguration {
                 ssid: CONFIG.wifi_ssid.try_into().unwrap(),
                 password: CONFIG.wifi_psk.try_into().unwrap(),
                 ..Default::default()
             });
-        
-            _ = controller.set_configuration(&config)
+
+            _ = controller
+                .set_configuration(&config)
                 .inspect_err(|e| log::error!("Failed to set WiFi configuration: {:?}", e));
-        
+
             log::info!("Starting WiFi");
-            _ = controller.start().await.inspect_err(|e| log::error!("Failed to start WiFi: {:?}", e));
-            
+            _ = controller
+                .start_async()
+                .await
+                .inspect_err(|e| log::error!("Failed to start WiFi: {:?}", e));
         }
 
-        match controller.connect().await {
+        match controller.connect_async().await {
             Ok(_) => {
                 log::info!("WiFi connected");
                 led.set_high();
-            },
+            }
             Err(e) => {
-                match e  {
+                match e {
                     WifiError::Disconnected => {
                         log::info!("WiFi not connected. Retry to connect in 5 s.");
                         led.set_low();
-                    },
+                    }
                     _ => {
                         log::error!("Failed to connect WiFi: {:?}", e);
                     }
                 }
 
                 Timer::after(Duration::from_secs(5)).await;
-            },
+            }
         }
     }
 }

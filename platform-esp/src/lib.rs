@@ -1,17 +1,16 @@
 #![no_std]
 
 use esp_hal::{
-    Blocking,
-    i2c::I2C,
     peripherals::I2C0,
-    rng::Rng,
+    rng::Rng, Blocking,
+    i2c::master::I2c,
 };
 use esp_wifi::wifi::{WifiDevice, WifiStaDevice};
-use lsm9ds1::{LSM9DS1, interface::I2cInterface};
+use lsm9ds1::{Lsm9ds1, interface::I2cInterface};
 
-pub type Sensor = LSM9DS1<I2cInterface<I2C<'static, I2C0, Blocking>>>;
 pub type NetworkDevice = WifiDevice<'static, WifiStaDevice>;
 pub type RngDevice = Rng;
+pub type Sensor = Lsm9ds1<I2cInterface<I2c<'static, Blocking>>>;
 
 #[cfg(feature="type-checks")]
 mod type_checks {

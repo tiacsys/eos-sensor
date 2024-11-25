@@ -4,29 +4,21 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-defmt = "0.3.8"
-embassy-executor = { version = "0.5.0", features = ["nightly"] }
-embassy-net = { version = "0.4.0", features = ["dhcpv4", "tcp"] }
-embassy-sync = "0.5.0"
-embassy-time = "0.3.0"
-embedded-websocket = { version = "0.9.3", default-features = false }
-esp-println = { version = "0.9.1", features = ["log"], optional = true }
+defmt = "0.3.10"
+embassy-executor = { version = "*", features = ["nightly"] }
+embassy-net = { version = "*", features = ["dhcpv4", "tcp"] }
+embassy-sync = "*"
+embassy-time = "*"
+embedded-websocket = { version = "*", default-features = false }
 hecate-protobuf = { git = "https://github.com/tiacsys/hecate-protobuf" }
-log = { version = "0.4.21", optional = true }
+log = { version = "*", optional = true }
 platform-esp = { path = "../platform-esp", optional = true }
 platform-stm = { path = "../platform-stm", optional = true }
-rand = { version = "0.8.5", default-features = false, features = ["alloc", "nightly"] }
-ringbuffer = "0.15.0"
-static_cell = { version = "2.1.0", features = ["nightly"] }
-
-[patch.crates-io]
-embassy-time-driver = { git = "https://github.com/embassy-rs/embassy", branch = "main" }
-embassy-time = { git = "https://github.com/embassy-rs/embassy", branch = "main" }
-embassy-net = { git = "https://github.com/embassy-rs/embassy", branch = "main" }
-embassy-executor = { git = "https://github.com/embassy-rs/embassy", branch = "main" }
-embassy-sync = { git = "https://github.com/embassy-rs/embassy", branch = "main" }
+rand = { version = "*", default-features = false, features = ["alloc", "nightly"] }
+ringbuffer = "*"
+static_cell = { version = "*", features = ["nightly"] }
 
 [features]
-platform-esp = ["dep:platform-esp", "dep:log", "embassy-time/generic-queue"]
+platform-esp = ["dep:platform-esp", "dep:log"]
 platform-stm = ["dep:platform-stm", "embassy-net/defmt"]
 # default = ["platform-esp"] # for debugging

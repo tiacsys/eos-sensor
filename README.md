@@ -21,7 +21,7 @@
   ```
 * Flash the image onto a board:
   ```bash
-  espflash target/xtensa-esp32-none-elf/release/eos-sensor-esp
+  espflash flash target/xtensa-esp32-none-elf/release/eos-sensor-esp
   ```
 
 ### STM32 Nucleo F767zi

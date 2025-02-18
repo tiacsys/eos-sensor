@@ -1,10 +1,10 @@
 [package]
 edition = "2021"
-name    = "eos-sensor-esp"
-version = "0.1.0"
+name    = "eos-sensor"
+version = "0.2.0"
 
 [[bin]]
-name = "eos-sensor-esp"
+name = "eos-sensor"
 test = false
 
 [dependencies]
@@ -64,7 +64,7 @@ esp-println = { version = "0.13.0", features = ["esp32", "defmt-espflash", "log"
 ringbuffer = {version = "0.15.0", features = ["alloc"] }
 hecate-protobuf = { git = "https://github.com/tiacsys/hecate-protobuf" }
 embassy-sync = { version = "0.6.2", features = ["defmt"] }
-lsm9ds1 = { path = "../lsm9ds1" }
+lsm9ds1 = { version = "0.1.0", git = "https://github.com/irockasingranite/lsm9ds1" }
 fugit = "0.3.7"
 anyhow = { version = "1.0.95", default-features = false }
 

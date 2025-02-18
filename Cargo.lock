@@ -542,6 +542,7 @@ dependencies = [
  "esp-println",
  "esp-wifi",
  "fugit",
+ "futures",
  "heapless 0.8.0",
  "hecate-protobuf",
  "log",

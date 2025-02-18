@@ -2,6 +2,7 @@
 #![no_main]
 #![feature(type_alias_impl_trait)]
 #![feature(impl_trait_in_assoc_type)]
+#![feature(try_with_capacity)]
 
 use esp_backtrace as _;
 use esp_println as _;

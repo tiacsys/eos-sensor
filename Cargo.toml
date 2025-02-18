@@ -67,6 +67,7 @@ embassy-sync = { version = "0.6.2", features = ["defmt"] }
 lsm9ds1 = { version = "0.1.0", git = "https://github.com/irockasingranite/lsm9ds1" }
 fugit = "0.3.7"
 anyhow = { version = "1.0.95", default-features = false }
+futures = { version = "0.3.31", default-features = false, features = ["alloc"]}
 
 [profile.dev]
 # Rust debug is too slow.

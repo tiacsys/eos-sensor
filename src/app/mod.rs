@@ -4,8 +4,8 @@ mod network;
 
 use network::network_task;
 
-use anyhow::Result;
 use alloc::sync::Arc;
+use anyhow::Result;
 use embassy_executor::Spawner;
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::mutex::Mutex;
@@ -18,7 +18,8 @@ use ringbuffer::{AllocRingBuffer, RingBuffer};
 type NetworkInterface = WifiDevice<'static, WifiStaDevice>;
 type Rng = esp_hal::rng::Rng;
 type Sensor = Lsm9ds1<I2cInterface<I2c<'static, Blocking>>>;
-type RingBufferMutex = Arc<Mutex<CriticalSectionRawMutex, AllocRingBuffer<proto::SensorDataSample>>>;
+type RingBufferMutex =
+    Arc<Mutex<CriticalSectionRawMutex, AllocRingBuffer<proto::SensorDataSample>>>;
 
 pub struct AppConfig {
     pub ws_host: &'static str,
@@ -58,10 +59,7 @@ pub async fn app(peripherals: AppPeripherals, config: AppConfig) {
 }
 
 #[embassy_executor::task]
-async fn sensor_sampling_task(
-    mut sensor: Sensor,
-    ringbuffer: RingBufferMutex,
-) {
+async fn sensor_sampling_task(mut sensor: Sensor, ringbuffer: RingBufferMutex) {
     let start_time = Instant::now();
 
     loop {
@@ -80,21 +78,27 @@ async fn sensor_sampling_task(
                 ringbuffer.push(sample);
             }
         }
-        
+
         timer.await;
     }
 }
 
-async fn sample_data(sensor: &mut Sensor) -> Result<(proto::Acceleration, proto::GyroscopeData, proto::MagnetometerData)> {
-        let acc = sensor
-            .get_accelerometer_data()
-            .map(|(x, y, z)| proto::Acceleration { x, y, z })?;
-        let gyro = sensor
-            .get_gyroscope_data()
-            .map(|(x, y, z)| proto::GyroscopeData { x, y, z })?;
-        let mag = sensor
-            .get_magnetometer_data()
-            .map(|(x, y, z)| proto::MagnetometerData { x, y, z })?;
+async fn sample_data(
+    sensor: &mut Sensor,
+) -> Result<(
+    proto::Acceleration,
+    proto::GyroscopeData,
+    proto::MagnetometerData,
+)> {
+    let acc = sensor
+        .get_accelerometer_data()
+        .map(|(x, y, z)| proto::Acceleration { x, y, z })?;
+    let gyro = sensor
+        .get_gyroscope_data()
+        .map(|(x, y, z)| proto::GyroscopeData { x, y, z })?;
+    let mag = sensor
+        .get_magnetometer_data()
+        .map(|(x, y, z)| proto::MagnetometerData { x, y, z })?;
 
-        Ok((acc, gyro, mag))
+    Ok((acc, gyro, mag))
 }

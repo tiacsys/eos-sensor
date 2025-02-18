@@ -80,7 +80,7 @@ async fn main(spawner: Spawner) {
     let timer1 = esp_hal::timer::timg::TimerGroup::new(peripherals.TIMG0);
     let wifi_init = &*make_static!(
         EspWifiController<'static>,
-        esp_wifi::init(timer1.timer0, rng.clone(), peripherals.RADIO_CLK,).unwrap()
+        esp_wifi::init(timer1.timer0, rng, peripherals.RADIO_CLK,).unwrap()
     );
 
     let (wifi_interface, wifi_controller) =
@@ -124,8 +124,8 @@ async fn main(spawner: Spawner) {
     // Set up application
     let app_peripherals = AppPeripherals {
         network_interface: wifi_interface,
-        rng: rng.clone(),
-        sensor
+        rng,
+        sensor,
     };
 
     let app_config = AppConfig {

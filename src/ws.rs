@@ -1,8 +1,8 @@
 use core::str::FromStr;
 
-use rand_core::RngCore;
-use embassy_net::{tcp::TcpSocket, Stack, Ipv4Address};
+use embassy_net::{tcp::TcpSocket, Ipv4Address, Stack};
 use embedded_websocket as ews;
+use rand_core::RngCore;
 
 pub struct WebSocket<'a, R, const BUFSIZE: usize>
 where
@@ -25,16 +25,18 @@ where
         rng: R,
         buffers: &'a mut WebSocketBuffers<BUFSIZE>,
     ) -> Result<Self, WebSocketError> {
-
         // Open TCP socket
         let mut tcp_socket = TcpSocket::new(net_stack, &mut buffers.tcp_rx, &mut buffers.tcp_tx);
-        let remote = (Ipv4Address::from_str(host).map_err(|_| WebSocketError::AddressError)?, port);
+        let remote = (
+            Ipv4Address::from_str(host).map_err(|_| WebSocketError::InvalidAddress)?,
+            port,
+        );
         tcp_socket.connect(remote).await?;
 
         let ws_options = ews::WebSocketOptions {
-            path: endpoint.into(),
-            host: host.into(),
-            origin: host.into(),
+            path: endpoint,
+            host,
+            origin: host,
             additional_headers: None,
             sub_protocols: None,
         };
@@ -57,14 +59,24 @@ where
     }
 
     pub async fn send_text(&mut self, text: &str) -> Result<(), WebSocketError> {
-        let len = self.ws_client.write(ews::WebSocketSendMessageType::Text, true, text.as_bytes(), &mut self.ws_frame_buffer)?;
+        let len = self.ws_client.write(
+            ews::WebSocketSendMessageType::Text,
+            true,
+            text.as_bytes(),
+            self.ws_frame_buffer,
+        )?;
         self.tcp_socket.write(&self.ws_frame_buffer[..len]).await?;
         self.tcp_socket.flush().await?;
         Ok(())
     }
 
     pub async fn send_binary(&mut self, buf: &[u8]) -> Result<(), WebSocketError> {
-        let len = self.ws_client.write(ews::WebSocketSendMessageType::Binary, true, buf, &mut self.ws_frame_buffer)?;
+        let len = self.ws_client.write(
+            ews::WebSocketSendMessageType::Binary,
+            true,
+            buf,
+            self.ws_frame_buffer,
+        )?;
         self.tcp_socket.write(&self.ws_frame_buffer[..len]).await?;
         self.tcp_socket.flush().await?;
         Ok(())
@@ -89,10 +101,21 @@ impl<const BUFSIZE: usize> WebSocketBuffers<BUFSIZE> {
 
 #[derive(Debug)]
 pub enum WebSocketError {
-    AddressError,
+    InvalidAddress,
     TcpError,
-    WebSocketError,
+    Underlying(ews::Error),
 }
+
+impl core::fmt::Display for WebSocketError {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> Result<(), core::fmt::Error> {
+        match self {
+            Self::Underlying(e) => e.fmt(f),
+            _ => write!(f, "{:?}", self),
+        }
+    }
+}
+
+impl core::error::Error for WebSocketError {}
 
 impl From<embassy_net::tcp::Error> for WebSocketError {
     fn from(_value: embassy_net::tcp::Error) -> Self {
@@ -107,7 +130,7 @@ impl From<embassy_net::tcp::ConnectError> for WebSocketError {
 }
 
 impl From<ews::Error> for WebSocketError {
-    fn from(_value: ews::Error) -> Self {
-        WebSocketError::WebSocketError
+    fn from(value: ews::Error) -> Self {
+        WebSocketError::Underlying(value)
     }
 }

@@ -4,10 +4,10 @@
 
 ### ESP32 Feather V2:
 
-* Install the `esp` rust toolchain for rustc v 1.77:
+* Install the `esp` rust toolchain and the `espflash` utility:
     ```bash
     cargo install espup
-    espup install -n 1.77.0 -v 1.77.0
+    espup install
     cargo install espflash
     ```
 
@@ -15,15 +15,20 @@
   ```bash
   source ~/export-esp-sh
   ```
+
 * Build the firmware image:
   ```bash
   cargo build --release
   ```
+
 * Flash the image onto a board:
   ```bash
-  espflash flash target/xtensa-esp32-none-elf/release/eos-sensor-esp
+  espflash flash target/xtensa-esp32-none-elf/release/eos-sensor
   ```
 
-### STM32 Nucleo F767zi
-
-Todo
+* Alternatively, use
+  ```bash
+  espflash flash --monitor -L defmt target/target/xtensa-esp32-none-elf/release/eos-sensor
+  ```
+  to flash the image and attach to the device to receive logging output.
+  `cargo run` is also mapped to this command for more convenient access.

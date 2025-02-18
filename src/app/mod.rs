@@ -7,7 +7,7 @@ use network::network_task;
 use anyhow::Result;
 use alloc::sync::Arc;
 use embassy_executor::Spawner;
-use embassy_sync::blocking_mutex::raw::NoopRawMutex; // We only run tasks on the same executor
+use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::mutex::Mutex;
 use embassy_time::{Instant, Timer};
 use esp_hal::{i2c::master::I2c, Blocking};
@@ -18,6 +18,7 @@ use ringbuffer::{AllocRingBuffer, RingBuffer};
 type NetworkInterface = WifiDevice<'static, WifiStaDevice>;
 type Rng = esp_hal::rng::Rng;
 type Sensor = Lsm9ds1<I2cInterface<I2c<'static, Blocking>>>;
+type RingBufferMutex = Arc<Mutex<CriticalSectionRawMutex, AllocRingBuffer<proto::SensorDataSample>>>;
 
 pub struct AppConfig {
     pub ws_host: &'static str,
@@ -38,7 +39,7 @@ pub async fn app(peripherals: AppPeripherals, config: AppConfig) {
 
     // Set up ringbuffer for sensor data
     let ringbuffer = AllocRingBuffer::<proto::SensorDataSample>::new(512);
-    let ringbuffer = Arc::new(Mutex::<NoopRawMutex, _>::new(ringbuffer));
+    let ringbuffer = Arc::new(Mutex::<CriticalSectionRawMutex, _>::new(ringbuffer));
 
     let mut sensor = peripherals.sensor;
     let temp = sensor.temperature_c().expect("Error reading temperature");
@@ -59,7 +60,7 @@ pub async fn app(peripherals: AppPeripherals, config: AppConfig) {
 #[embassy_executor::task]
 async fn sensor_sampling_task(
     mut sensor: Sensor,
-    ringbuffer: Arc<Mutex<NoopRawMutex, AllocRingBuffer<proto::SensorDataSample>>>,
+    ringbuffer: RingBufferMutex,
 ) {
     let start_time = Instant::now();
 

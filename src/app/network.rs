@@ -5,23 +5,21 @@ use hecate_protobuf as proto;
 
 use proto::Message;
 
-use alloc::sync::Arc;
 use alloc::vec::Vec;
 use anyhow::{anyhow, Error, Result};
 use embassy_executor::Spawner;
 use embassy_net::StackResources;
-use embassy_sync::{blocking_mutex::raw::NoopRawMutex, mutex::Mutex};
 use embassy_time::Timer;
 use futures::future::TryFutureExt;
 use rand_core::RngCore;
-use ringbuffer::{AllocRingBuffer, RingBuffer};
+use ringbuffer::RingBuffer;
 
 #[embassy_executor::task]
 pub async fn network_task(
     app_config: AppConfig,
     interface: NetworkInterface,
     mut rng: Rng,
-    ringbuffer: Arc<Mutex<NoopRawMutex, AllocRingBuffer<proto::SensorDataSample>>>,
+    ringbuffer: super::RingBufferMutex,
 ) {
     // Create network stack
     let config = embassy_net::Config::dhcpv4(Default::default());

@@ -42,9 +42,7 @@ pub async fn app(peripherals: AppPeripherals, config: AppConfig) {
     let ringbuffer = AllocRingBuffer::<proto::SensorDataSample>::new(512);
     let ringbuffer = Arc::new(Mutex::<CriticalSectionRawMutex, _>::new(ringbuffer));
 
-    let mut sensor = peripherals.sensor;
-    let temp = sensor.temperature_c().expect("Error reading temperature");
-    log::info!("Temp: {temp}°C");
+    let sensor = peripherals.sensor;
 
     // Spawn network task
     _ = spawner.spawn(network_task(

@@ -1,5 +1,12 @@
 # Eos Sensor Firmware
 
+## Configuration
+
+* Modify `cfg.toml` to match your environment for:
+  * WiFi SSID and credentials
+  * server IP:port and endpoint
+  * client name
+
 ## Building and flashing
 
 ### ESP32 Feather V2:
@@ -13,7 +20,7 @@
 
 * Bring the toolchain installed this way into `PATH`:
   ```bash
-  source ~/export-esp-sh
+  source ~/export-esp.sh
   ```
 
 * Build the firmware image:
@@ -28,7 +35,7 @@
 
 * Alternatively, use
   ```bash
-  espflash flash --monitor -L defmt target/target/xtensa-esp32-none-elf/release/eos-sensor
+  espflash flash --monitor -L defmt target/xtensa-esp32-none-elf/release/eos-sensor
   ```
   to flash the image and attach to the device to receive logging output.
   `cargo run` is also mapped to this command for more convenient access.
